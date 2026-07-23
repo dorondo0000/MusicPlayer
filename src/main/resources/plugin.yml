@@ -1,0 +1,7 @@
+﻿name: MusicPlayer
+version: ${version}
+main: kr.dorondo.cinematomusic.MusicPlayer
+api-version: '1.21'
+author: dorondo
+description: Simple music player using Cinema mod without screens
+softdepend: [Skript]

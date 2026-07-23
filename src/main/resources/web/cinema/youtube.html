@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        html, body, #player { width: 100%; height: 100%; margin: 0; background: #000; overflow: hidden; }
+    </style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+    let player;
+    let pendingVideo = null;
+    let pendingSeek = 0;
+    let pendingVolume = 100;
+    let videoGeneration = 0;
+    let loadTimer = null;
+    let volumeRestoreTimer = null;
+    let startupMuted = false;
+    let playbackStartedGeneration = -1;
+    let finalizedGeneration = -1;
+
+    function clearPlaybackTimers() {
+        if (loadTimer !== null) clearTimeout(loadTimer);
+        if (volumeRestoreTimer !== null) clearTimeout(volumeRestoreTimer);
+        loadTimer = null;
+        volumeRestoreTimer = null;
+    }
+
+    function startCuedVideo(generation) {
+        if (generation !== videoGeneration || playbackStartedGeneration === generation) return;
+        playbackStartedGeneration = generation;
+        if (player.seekTo) player.seekTo(pendingSeek, true);
+        setTimeout(() => {
+            if (generation === videoGeneration && player.playVideo) player.playVideo();
+        }, 60);
+    }
+
+    function finalizePlaybackStart(generation) {
+        if (generation !== videoGeneration || finalizedGeneration === generation) return;
+        finalizedGeneration = generation;
+
+        // One final startup seek while muted. The generation guard guarantees
+        // this can only happen once and can never become a playback loop.
+        if (player.seekTo) player.seekTo(pendingSeek, true);
+        volumeRestoreTimer = setTimeout(() => {
+            if (generation !== videoGeneration) return;
+            startupMuted = false;
+            player.setVolume(pendingVolume);
+        }, 250);
+    }
+
+    function scheduleVideoLoad(delay = 120) {
+        if (!pendingVideo || !player) return;
+        if (loadTimer !== null) clearTimeout(loadTimer);
+        const generation = videoGeneration;
+        loadTimer = setTimeout(() => {
+            loadTimer = null;
+            if (generation !== videoGeneration || !pendingVideo) return;
+
+            player.setVolume(0);
+            player.cueVideoById({
+                videoId: pendingVideo,
+                startSeconds: pendingSeek
+            });
+        }, delay);
+    }
+
+    window.onYouTubeIframeAPIReady = function () {
+        player = new YT.Player('player', {
+            width: '100%',
+            height: '100%',
+            playerVars: {
+                autoplay: 1,
+                controls: 0,
+                disablekb: 1,
+                playsinline: 1,
+                rel: 0
+            },
+            events: {
+                onReady: function () {
+                    player.setVolume(startupMuted ? 0 : pendingVolume);
+                    scheduleVideoLoad(50);
+                },
+                onStateChange: function (event) {
+                    if (event.data === YT.PlayerState.CUED) {
+                        startCuedVideo(videoGeneration);
+                    } else if (event.data === YT.PlayerState.PLAYING) {
+                        finalizePlaybackStart(videoGeneration);
+                    }
+                }
+            }
+        });
+    };
+
+    window.th_video = function (id) {
+        clearPlaybackTimers();
+        videoGeneration += 1;
+        playbackStartedGeneration = -1;
+        finalizedGeneration = -1;
+        startupMuted = true;
+        pendingVideo = id;
+        pendingSeek = 0;
+        if (player && player.setVolume) player.setVolume(0);
+        scheduleVideoLoad();
+    };
+
+    window.th_volume = function (volume) {
+        pendingVolume = Math.max(0, Math.min(100, Number(volume) || 0));
+        if (!startupMuted && player && player.setVolume) player.setVolume(pendingVolume);
+    };
+
+    window.th_seek = function (seconds) {
+        pendingSeek = Math.max(0, Number(seconds) || 0);
+        if (startupMuted && playbackStartedGeneration === videoGeneration &&
+            finalizedGeneration !== videoGeneration && player?.seekTo) {
+            player.seekTo(pendingSeek, true);
+        }
+    };
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

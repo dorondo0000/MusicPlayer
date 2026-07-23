@@ -1,0 +1,17 @@
+.gradle/
+build/
+.idea/
+*.iml
+
+# Local research and extracted Cinema Mod artifacts
+CinemaMod-master/
+cinema_extracted/
+cinema.zip
+cinemamod-*.jar
+cinema_functions.txt
+temp_functions.txt
+
+# Runtime data
+plugins/
+logs/
+*.log

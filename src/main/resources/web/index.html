@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MusicPlayer</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #000;
+            --panel: #121212;
+            --panel-soft: #181818;
+            --panel-hover: #242424;
+            --line: #2a2a2a;
+            --text: #fff;
+            --muted: #a7a7a7;
+            --green: #1ed760;
+            --green-hover: #3be477;
+            --danger: #ff5f57;
+            --player-height: 92px;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, Pretendard, "Noto Sans KR", system-ui, sans-serif;
+        }
+
+        button, input { font: inherit; }
+        button { color: inherit; }
+
+        .app {
+            height: 100%;
+            display: grid;
+            grid-template-columns: 276px minmax(0, 1fr);
+            grid-template-rows: minmax(0, 1fr) var(--player-height);
+            gap: 8px;
+            padding: 8px 8px 0;
+        }
+
+        .sidebar,
+        .main {
+            min-height: 0;
+            background: var(--panel);
+            border-radius: 9px;
+        }
+
+        .sidebar {
+            padding: 20px 12px 14px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 0 10px 22px;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-mark {
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--green);
+            color: #07180d;
+            font-size: 18px;
+        }
+
+        .library-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px 12px;
+        }
+
+        .library-title {
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .icon-btn,
+        .row-btn {
+            border: 0;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 50%;
+            transition: .15s ease;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            font-size: 20px;
+        }
+
+        .icon-btn:hover,
+        .row-btn:hover {
+            background: var(--panel-hover);
+            color: var(--text);
+        }
+
+        .playlist-list {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .playlist-card {
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr);
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 7px;
+            cursor: pointer;
+        }
+
+        .playlist-card:hover,
+        .playlist-card.selected { background: var(--panel-hover); }
+
+        .queue-shortcut {
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 12px;
+        }
+
+        .queue-shortcut .playlist-cover {
+            background: linear-gradient(135deg, #6046d8, #86a8ff);
+        }
+
+        .playlist-cover {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #2e7d4f, #143621);
+            font-size: 20px;
+        }
+
+        .playlist-name,
+        .track-name {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .playlist-name { font-size: 14px; font-weight: 600; }
+        .playlist-meta { margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+        .main {
+            overflow-y: auto;
+            background:
+                linear-gradient(180deg, rgba(39, 91, 59, .52) 0, rgba(18, 18, 18, .96) 270px),
+                var(--panel);
+        }
+
+        .topbar {
+            min-height: 74px;
+            padding: 18px 26px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: rgba(18, 18, 18, .72);
+            backdrop-filter: blur(18px);
+        }
+
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            color: #ddd;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 4px rgba(30, 215, 96, .13);
+        }
+
+        .top-actions { display: flex; gap: 9px; }
+
+        .button {
+            min-height: 38px;
+            padding: 0 17px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 0;
+            border-radius: 999px;
+            background: #fff;
+            color: #111;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform .15s ease, background .15s ease;
+        }
+
+        .button:hover { transform: scale(1.03); }
+        .button.secondary { background: rgba(0, 0, 0, .55); color: #fff; }
+        .button.primary { background: var(--green); color: #07180d; }
+        .button.primary:hover { background: var(--green-hover); }
+        .button:disabled { opacity: .55; cursor: wait; transform: none; }
+
+        .content { padding: 28px 28px 44px; }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(300px, 370px);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .browse-panel { min-width: 0; }
+
+        .queue-panel {
+            min-height: 420px;
+            max-height: calc(100vh - var(--player-height) - 138px);
+            position: sticky;
+            top: 92px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .1);
+            border-radius: 10px;
+            background: rgba(10, 10, 10, .56);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, .2);
+        }
+
+        .queue-panel.drag-target {
+            border-color: var(--green);
+            box-shadow: 0 0 0 2px rgba(30, 215, 96, .14);
+        }
+
+        .queue-panel-head {
+            padding: 18px 18px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .queue-panel-title { font-size: 16px; font-weight: 800; }
+        .queue-panel-meta { margin-top: 4px; color: var(--muted); font-size: 11px; }
+        .queue-panel-list { padding: 8px; overflow-y: auto; }
+
+        .queue-compact-row {
+            display: grid;
+            grid-template-columns: 26px 40px minmax(0, 1fr) 28px;
+            align-items: center;
+            gap: 8px;
+            min-height: 54px;
+            padding: 6px;
+            border-radius: 6px;
+            color: var(--muted);
+            cursor: grab;
+        }
+
+        .queue-compact-row:hover { background: rgba(255, 255, 255, .075); }
+        .queue-compact-row.current .track-name { color: var(--green); }
+        .queue-compact-row.dragging { opacity: .35; }
+        .queue-compact-row.drag-over { outline: 1px solid var(--green); }
+        .queue-compact-row .track-cover { width: 40px; height: 40px; }
+        .queue-compact-row .row-actions { opacity: 0; }
+        .queue-compact-row:hover .row-actions { opacity: 1; }
+
+        .drop-hint {
+            margin: 8px;
+            padding: 13px;
+            border: 1px dashed #4d4d4d;
+            border-radius: 7px;
+            color: var(--muted);
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .source-row { cursor: default; }
+        .source-row[draggable="true"] { cursor: grab; }
+        .source-row.dragging { opacity: .4; }
+        .queue-row.source-row {
+            grid-template-columns: 44px minmax(220px, 1.8fr) minmax(110px, 1fr) 64px 164px;
+        }
+
+        .heading-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .view-actions { display: flex; align-items: center; gap: 9px; }
+        .button.danger { background: transparent; color: #f28b82; }
+        .button.danger:hover { background: rgba(242, 139, 130, .12); }
+
+        h1 { margin: 0; font-size: clamp(28px, 3vw, 40px); letter-spacing: -1.5px; }
+        .subtitle { margin-top: 7px; color: #d0d0d0; font-size: 14px; }
+
+        .queue-table { width: 100%; }
+
+        .queue-header,
+        .queue-row {
+            display: grid;
+            grid-template-columns: 44px minmax(220px, 1.8fr) minmax(120px, 1fr) 70px 108px;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .queue-header {
+            height: 38px;
+            padding: 0 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, .14);
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+        }
+
+        .queue-row {
+            min-height: 64px;
+            padding: 7px 12px;
+            border-radius: 6px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .queue-row:hover { background: rgba(255, 255, 255, .075); }
+        .queue-row.current { color: #d9d9d9; }
+        .queue-row.current .track-name { color: var(--green); }
+        .queue-row.dragging { opacity: .35; }
+        .queue-row.drag-over { outline: 1px solid var(--green); }
+
+        .track-index { text-align: center; font-variant-numeric: tabular-nums; }
+
+        .track-cell {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .track-cover,
+        .now-cover {
+            flex: 0 0 auto;
+            object-fit: cover;
+            background: linear-gradient(135deg, #333, #171717);
+        }
+
+        .track-cover { width: 46px; height: 46px; border-radius: 4px; }
+        .track-cover[src=""],
+        .now-cover[src=""] { visibility: hidden; }
+        .track-name { color: var(--text); font-size: 14px; font-weight: 600; }
+        .track-author { margin-top: 4px; color: var(--muted); font-size: 12px; }
+        .duration { font-variant-numeric: tabular-nums; }
+
+        .row-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 2px;
+            opacity: 0;
+        }
+
+        .queue-row:hover .row-actions,
+        .queue-row:focus-within .row-actions { opacity: 1; }
+
+        .row-btn { width: 30px; height: 30px; }
+        .row-btn.remove:hover { color: var(--danger); }
+
+        .empty {
+            padding: 80px 20px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .empty-symbol { display: block; margin-bottom: 14px; font-size: 42px; }
+
+        .player {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(210px, 1fr) minmax(330px, 1.3fr) minmax(210px, 1fr);
+            align-items: center;
+            gap: 20px;
+            padding: 0 18px;
+            background: #000;
+        }
+
+        .now {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .now-cover { width: 58px; height: 58px; border-radius: 5px; }
+        .now-copy { min-width: 0; }
+        .now-title { font-size: 13px; font-weight: 600; }
+        .now-author { margin-top: 4px; color: var(--muted); font-size: 11px; }
+
+        .transport { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+        .transport-buttons { display: flex; align-items: center; gap: 18px; }
+
+        .transport-btn {
+            width: 32px;
+            height: 32px;
+            border: 0;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 17px;
+        }
+
+        .transport-btn:hover { color: var(--text); }
+        .transport-btn.active {
+            color: var(--green);
+            position: relative;
+        }
+        .transport-btn.active::after {
+            content: "";
+            width: 4px;
+            height: 4px;
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .transport-btn.stop {
+            width: 26px;
+            height: 26px;
+            font-size: 13px;
+        }
+
+        .transport-btn.play {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #fff;
+            color: #000;
+            font-size: 15px;
+        }
+
+        .transport-btn.play:hover { transform: scale(1.06); }
+
+        .timeline {
+            width: min(100%, 590px);
+            display: grid;
+            grid-template-columns: 42px 1fr 42px;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .timeline span:last-child { text-align: right; }
+        .progress {
+            width: 100%;
+            height: 16px;
+            margin: 0;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            background: transparent;
+        }
+        .progress:disabled { cursor: not-allowed; opacity: .45; }
+        .progress::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 99px;
+            background: linear-gradient(to right, var(--green) 0 var(--seek-percent, 0%), #4d4d4d var(--seek-percent, 0%) 100%);
+        }
+        .progress::-moz-range-track { height: 4px; border-radius: 99px; background: #4d4d4d; }
+        .progress::-moz-range-progress { height: 4px; border-radius: 99px; background: var(--green); }
+        .progress::-webkit-slider-thumb {
+            width: 12px;
+            height: 12px;
+            margin-top: -4px;
+            border: 0;
+            border-radius: 50%;
+            appearance: none;
+            -webkit-appearance: none;
+            background: #fff;
+            opacity: 0;
+            transition: opacity .15s;
+        }
+        .progress::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border: 0;
+            border-radius: 50%;
+            background: #fff;
+            opacity: 0;
+        }
+        .progress:hover::-webkit-slider-thumb,
+        .progress:focus-visible::-webkit-slider-thumb { opacity: 1; }
+        .progress:hover::-moz-range-thumb,
+        .progress:focus-visible::-moz-range-thumb { opacity: 1; }
+
+        .player-tools {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .online { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+        .switch { display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
+        .switch input { display: none; }
+        .switch-track { width: 31px; height: 17px; padding: 2px; border-radius: 99px; background: #555; transition: .2s; }
+        .switch-knob { width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: .2s; }
+        .switch input:checked + .switch-track { background: var(--green); }
+        .switch input:checked + .switch-track .switch-knob { transform: translateX(14px); }
+
+        dialog {
+            width: min(92vw, 480px);
+            padding: 0;
+            border: 1px solid #363636;
+            border-radius: 12px;
+            background: #282828;
+            color: #fff;
+            box-shadow: 0 24px 90px rgba(0, 0, 0, .7);
+        }
+
+        dialog::backdrop { background: rgba(0, 0, 0, .72); backdrop-filter: blur(3px); }
+        .modal { padding: 25px; }
+        .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+        .modal h2 { margin: 0; font-size: 22px; letter-spacing: -.5px; }
+        .field { margin-bottom: 16px; }
+        .field label { display: block; margin-bottom: 8px; color: #ddd; font-size: 12px; font-weight: 700; }
+        .field input {
+            width: 100%;
+            height: 46px;
+            padding: 0 13px;
+            border: 1px solid #727272;
+            border-radius: 5px;
+            outline: none;
+            background: #121212;
+            color: #fff;
+        }
+        .field input:focus { border-color: #fff; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 112px;
+            z-index: 50;
+            transform: translate(-50%, 20px);
+            padding: 11px 16px;
+            border-radius: 6px;
+            background: #2e77d0;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            opacity: 0;
+            pointer-events: none;
+            transition: .2s ease;
+        }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); }
+        .toast.error { background: #c94343; }
+
+        ::-webkit-scrollbar { width: 11px; }
+        ::-webkit-scrollbar-thumb { background: #555; border: 3px solid transparent; background-clip: padding-box; }
+
+        @media (max-width: 900px) {
+            .app { grid-template-columns: 210px minmax(0, 1fr); }
+            .workspace { grid-template-columns: 1fr; }
+            .queue-panel { position: static; max-height: 440px; }
+            .queue-header, .queue-row { grid-template-columns: 38px minmax(180px, 1fr) 60px 98px; }
+            .queue-row.source-row { grid-template-columns: 38px minmax(180px, 1fr) 60px 154px; }
+            .queue-header .artist-head, .queue-row .artist-col { display: none; }
+            .player { grid-template-columns: minmax(160px, .8fr) minmax(300px, 1.3fr); }
+            .player-tools { display: none; }
+        }
+
+        @media (max-width: 680px) {
+            :root { --player-height: 142px; }
+            html, body { overflow: auto; }
+            .app {
+                min-height: 100%;
+                height: auto;
+                display: block;
+                padding: 0;
+            }
+            .sidebar { border-radius: 0; padding: 15px; }
+            .brand { padding-bottom: 12px; }
+            .playlist-list { max-height: 152px; }
+            .main { min-height: calc(100vh - 260px); border-radius: 0; }
+            .topbar { padding: 14px 16px; }
+            .content { padding: 22px 16px 170px; }
+            .button .wide-label { display: none; }
+            .queue-header { display: none; }
+            .queue-row { grid-template-columns: 28px minmax(0, 1fr) 98px; }
+            .queue-row.source-row { grid-template-columns: 28px minmax(0, 1fr) 154px; }
+            .queue-row .artist-col, .queue-row .duration { display: none; }
+            .row-actions { opacity: 1; }
+            .player {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 20;
+                height: var(--player-height);
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 5px;
+                padding: 10px 14px;
+                border-top: 1px solid #222;
+            }
+            .now-cover { width: 42px; height: 42px; }
+            .transport { gap: 6px; }
+            .transport-buttons { position: absolute; right: 12px; top: 14px; gap: 6px; }
+            .transport-btn { width: 28px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">♪</span> MusicPlayer</div>
+        <div class="library-head">
+            <span class="library-title">내 라이브러리</span>
+            <button class="icon-btn" type="button" title="YouTube 플레이리스트 가져오기" onclick="openDialog('import-dialog')">＋</button>
+        </div>
+        <div class="queue-shortcut">
+            <div id="recent-shortcut" class="playlist-card selected" tabindex="0" onclick="showRecent()"
+                 onkeydown="if(event.key==='Enter') showRecent()">
+                <div class="playlist-cover">↺</div>
+                <div>
+                    <div class="playlist-name">최근 재생한 곡</div>
+                    <div id="recent-shortcut-meta" class="playlist-meta">최대 30곡</div>
+                </div>
+            </div>
+        </div>
+        <div id="playlist-list" class="playlist-list">
+            <div class="empty">불러오는 중...</div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="server-status"><span class="status-dot"></span><span id="online-label">서버 연결됨</span></div>
+            <div class="top-actions">
+                <button class="button secondary" type="button" onclick="openDialog('import-dialog')">플리 가져오기</button>
+                <button class="button primary" type="button" onclick="openTrackDialog()"><span>＋</span><span class="wide-label">곡 추가</span></button>
+            </div>
+        </header>
+
+        <section class="content">
+            <div class="workspace">
+                <section class="browse-panel">
+                    <div class="heading-row">
+                        <div>
+                            <h1 id="view-title">최근 재생한 곡</h1>
+                            <div id="view-summary" class="subtitle">최근 들은 음악이 최대 30곡까지 자동으로 저장됩니다.</div>
+                        </div>
+                        <div id="view-actions" class="view-actions"></div>
+                    </div>
+
+                    <div class="queue-table">
+                        <div class="queue-header">
+                            <div>#</div><div>제목</div><div class="artist-head">아티스트</div><div>시간</div><div></div>
+                        </div>
+                        <div id="content-list"></div>
+                    </div>
+                </section>
+
+                <aside id="queue-panel" class="queue-panel"
+                       ondragover="queuePanelDragOver(event)"
+                       ondragleave="queuePanelDragLeave(event)"
+                       ondrop="queuePanelDrop(event)">
+                    <div class="queue-panel-head">
+                        <div>
+                            <div class="queue-panel-title">재생 대기열</div>
+                            <div id="queue-panel-meta" class="queue-panel-meta">0곡</div>
+                        </div>
+                        <button class="icon-btn" type="button" title="재생 중지 및 대기열 비우기" onclick="stopMusic()">×</button>
+                    </div>
+                    <div id="queue-panel-list" class="queue-panel-list"></div>
+                    <div class="drop-hint">플레이리스트의 곡을 여기로 끌어 추가</div>
+                </aside>
+            </div>
+        </section>
+    </main>
+
+    <footer class="player">
+        <div class="now">
+            <img id="now-cover" class="now-cover" alt="" src="">
+            <div class="now-copy">
+                <div id="now-title" class="now-title track-name">재생 중인 곡 없음</div>
+                <div id="now-author" class="now-author track-name">YouTube 음악을 추가해 보세요</div>
+            </div>
+        </div>
+
+        <div class="transport">
+            <div class="transport-buttons">
+                <button class="transport-btn stop" type="button" aria-label="재생 정지" title="정지" onclick="stopMusic()">■</button>
+                <button class="transport-btn" type="button" aria-label="현재 곡 처음 또는 이전 곡" title="처음부터 / 이전 곡" onclick="previousTrack()">⏮</button>
+                <button id="play-button" class="transport-btn play" type="button" aria-label="재생 또는 일시정지" onclick="playPause()">▶</button>
+                <button class="transport-btn" type="button" aria-label="다음 곡" onclick="nextTrack()">⏭</button>
+                <button id="loop-button" class="transport-btn" type="button" aria-label="대기열 반복" title="대기열 반복" aria-pressed="false" onclick="toggleLoop()">↻</button>
+            </div>
+            <div class="timeline">
+                <span id="current-time">0:00</span>
+                <input id="seek-slider" class="progress" type="range" min="0" max="0" step="1" value="0"
+                       aria-label="재생 위치"
+                       onpointerdown="startSeeking()"
+                       onpointercancel="cancelSeeking()"
+                       oninput="previewSeek(this.value)"
+                       onchange="commitSeek(this.value)">
+                <span id="total-time">--:--</span>
+            </div>
+        </div>
+
+        <div class="player-tools">
+            <span class="online">● <span id="online-count">0</span>명 접속</span>
+            <label class="switch" title="BossBar 표시">
+                <span>BossBar</span>
+                <input id="bossbar-toggle" type="checkbox" onchange="toggleBossbar(this.checked)">
+                <span class="switch-track"><span class="switch-knob"></span></span>
+            </label>
+        </div>
+    </footer>
+</div>
+
+<dialog id="track-dialog">
+    <form class="modal" onsubmit="addTrack(event)">
+        <div class="modal-head">
+            <h2>대기열에 곡 추가</h2>
+            <button class="icon-btn" type="button" aria-label="닫기" onclick="closeDialog('track-dialog')">×</button>
+        </div>
+        <div class="field">
+            <label for="youtube-url">YouTube 영상 URL</label>
+            <input id="youtube-url" type="url" required placeholder="https://www.youtube.com/watch?v=...">
+        </div>
+        <div class="modal-actions">
+            <button class="button secondary" type="button" onclick="closeDialog('track-dialog')">취소</button>
+            <button id="add-track-button" class="button primary" type="submit">곡 추가</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="import-dialog">
+    <form class="modal" onsubmit="importPlaylist(event)">
+        <div class="modal-head">
+            <h2>YouTube 플리 가져오기</h2>
+            <button class="icon-btn" type="button" aria-label="닫기" onclick="closeDialog('import-dialog')">×</button>
+        </div>
+        <div class="field">
+            <label for="playlist-url">공개 플레이리스트 URL</label>
+            <input id="playlist-url" type="url" required placeholder="https://www.youtube.com/playlist?list=...">
+        </div>
+        <div class="field">
+            <label for="playlist-name">플레이리스트 이름</label>
+            <input id="playlist-name" type="text" required maxlength="100" placeholder="내 플레이리스트">
+        </div>
+        <div class="modal-actions">
+            <button class="button secondary" type="button" onclick="closeDialog('import-dialog')">취소</button>
+            <button id="import-button" class="button primary" type="submit">가져오기</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="rename-dialog">
+    <form class="modal" onsubmit="renamePlaylist(event)">
+        <div class="modal-head">
+            <h2>플레이리스트 이름 변경</h2>
+            <button class="icon-btn" type="button" aria-label="닫기" onclick="closeDialog('rename-dialog')">×</button>
+        </div>
+        <div class="field">
+            <label for="rename-playlist-name">표시 이름</label>
+            <input id="rename-playlist-name" type="text" required maxlength="100">
+        </div>
+        <div class="modal-actions">
+            <button class="button secondary" type="button" onclick="closeDialog('rename-dialog')">취소</button>
+            <button class="button primary" type="submit">저장</button>
+        </div>
+    </form>
+</dialog>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+    const state = {
+        queue: [],
+        currentIndex: 0,
+        isPlaying: false,
+        isPaused: false,
+        loopEnabled: false,
+        positionSeconds: 0,
+        durationSeconds: 0,
+        stateReceivedAt: Date.now(),
+        onlinePlayers: [],
+        playlists: [],
+        recent: [],
+        view: 'recent',
+        selectedPlaylistName: null
+    };
+    let toastTimer;
+    let isSeeking = false;
+    let seekPreviewSeconds = 0;
+
+    const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
+    function videoId(url) {
+        try {
+            const parsed = new URL(url);
+            if (parsed.hostname.includes('youtu.be')) return parsed.pathname.slice(1).split('/')[0];
+            return parsed.searchParams.get('v') || parsed.pathname.split('/').filter(Boolean).pop();
+        } catch (_) {
+            return '';
+        }
+    }
+
+    function thumbnail(track) {
+        const id = videoId(track?.youtubeUrl || '');
+        return id ? `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg` : '';
+    }
+
+    function formatTime(seconds) {
+        const total = Math.max(0, Math.floor(Number(seconds) || 0));
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const secs = total % 60;
+        return hours > 0
+            ? `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+            : `${minutes}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function openDialog(id) {
+        document.getElementById(id).showModal();
+        setTimeout(() => document.getElementById(id).querySelector('input')?.focus(), 0);
+    }
+
+    function closeDialog(id) {
+        document.getElementById(id).close();
+    }
+
+    function toast(message, error = false) {
+        const element = document.getElementById('toast');
+        element.textContent = message;
+        element.className = `toast show${error ? ' error' : ''}`;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => element.className = 'toast', 2600);
+    }
+
+    async function api(path, options = {}) {
+        const response = await fetch(path, options);
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || '요청을 처리하지 못했습니다.');
+        return body;
+    }
+
+    async function loadState() {
+        try {
+            const data = await api('/api/state');
+            state.queue = data.queue || [];
+            state.currentIndex = Number(data.currentIndex) || 0;
+            state.isPlaying = Boolean(data.isPlaying);
+            state.isPaused = Boolean(data.isPaused);
+            state.loopEnabled = Boolean(data.loopEnabled);
+            state.positionSeconds = Number(data.positionSeconds) || 0;
+            state.durationSeconds = Number(data.durationSeconds) || 0;
+            state.recent = data.recentTracks || state.recent;
+            state.onlinePlayers = data.onlinePlayers || [];
+            state.stateReceivedAt = Date.now();
+            document.getElementById('bossbar-toggle').checked = Boolean(data.bossbarEnabled);
+            document.getElementById('recent-shortcut-meta').textContent =
+                `${state.recent.length}곡 · 최대 30곡`;
+            render();
+        } catch (error) {
+            document.getElementById('online-label').textContent = '서버 연결 끊김';
+        }
+    }
+
+    async function loadPlaylists() {
+        try {
+            const playlists = await api('/api/playlists');
+            state.playlists = playlists;
+            const list = document.getElementById('playlist-list');
+            if (!playlists.length) {
+                list.innerHTML = '<div class="empty">저장된 플레이리스트가 없습니다.</div>';
+                if (state.view === 'playlist') showRecent();
+                return;
+            }
+            list.innerHTML = playlists.map((playlist) => `
+                <div class="playlist-card${state.selectedPlaylistName === playlist.name ? ' selected' : ''}"
+                     tabindex="0" onclick="openPlaylist('${playlist.name}')"
+                     onkeydown="if(event.key==='Enter') openPlaylist('${playlist.name}')">
+                    <div class="playlist-cover">♫</div>
+                    <div>
+                        <div class="playlist-name">${escapeHtml(playlist.displayName)}</div>
+                        <div class="playlist-meta">플레이리스트 · ${playlist.tracks.length}곡</div>
+                    </div>
+                </div>
+            `).join('');
+            renderMain();
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    async function loadRecent() {
+        try {
+            state.recent = await api('/api/recent');
+            document.getElementById('recent-shortcut-meta').textContent =
+                `${state.recent.length}곡 · 최대 30곡`;
+            if (state.view === 'recent') renderMain();
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    function render() {
+        renderMain();
+        renderQueuePanel();
+        renderPlayer();
+        const count = state.onlinePlayers.length;
+        document.getElementById('online-count').textContent = count;
+        document.getElementById('online-label').textContent = `${count}명과 음악 공유 중`;
+        document.getElementById('queue-panel-meta').textContent =
+            `${state.queue.length}곡 · 실제 서버 재생 순서`;
+    }
+
+    function selectedPlaylist() {
+        return state.playlists.find(playlist => playlist.name === state.selectedPlaylistName);
+    }
+
+    function showRecent() {
+        state.view = 'recent';
+        state.selectedPlaylistName = null;
+        renderLibrarySelection();
+        renderMain();
+    }
+
+    function openPlaylist(name) {
+        state.view = 'playlist';
+        state.selectedPlaylistName = name;
+        renderLibrarySelection();
+        renderMain();
+    }
+
+    function renderLibrarySelection() {
+        document.getElementById('recent-shortcut').classList.toggle('selected', state.view === 'recent');
+        document.querySelectorAll('#playlist-list .playlist-card').forEach(card => {
+            card.classList.toggle('selected', card.getAttribute('onclick')?.includes(`'${state.selectedPlaylistName}'`));
+        });
+    }
+
+    function renderMain() {
+        const playlist = selectedPlaylist();
+        if (state.view === 'playlist' && playlist) {
+            renderPlaylist(playlist);
+        } else {
+            renderRecent();
+        }
+    }
+
+    function renderRecent() {
+        document.getElementById('view-title').textContent = '최근 재생한 곡';
+        document.getElementById('view-summary').textContent =
+            `최근 들은 음악 ${state.recent.length}곡 · 최대 30곡까지 자동 저장됩니다.`;
+        document.getElementById('view-actions').innerHTML = '';
+        const list = document.getElementById('content-list');
+        if (!state.recent.length) {
+            list.innerHTML = '<div class="empty"><span class="empty-symbol">↺</span>아직 재생 기록이 없습니다.<br>음악을 재생하면 여기에 자동으로 모입니다.</div>';
+            return;
+        }
+        list.innerHTML = state.recent.map((track, index) => `
+                <div class="queue-row source-row" draggable="true"
+                     ondragstart="sourceDragStart(event, 'recent', ${index})"
+                     ondragend="sourceDragEnd(event)">
+                    <div class="track-index">${index + 1}</div>
+                    <div class="track-cell">
+                        <img class="track-cover" alt="" src="${thumbnail(track)}">
+                        <div style="min-width:0">
+                            <div class="track-name">${escapeHtml(track.title)}</div>
+                            <div class="track-author">${escapeHtml(track.author || '알 수 없는 아티스트')}</div>
+                        </div>
+                    </div>
+                    <div class="artist-col track-name">${escapeHtml(track.author || '—')}</div>
+                    <div class="duration">${track.duration > 0 ? formatTime(track.duration) : '—'}</div>
+                    <div class="row-actions">
+                        <button class="row-btn" type="button" title="지금 재생" onclick="playRecentTrack(${index})">▶</button>
+                        <button class="row-btn" type="button" title="대기열에 추가" onclick="addTrackObjectToQueue(state.recent[${index}])">＋</button>
+                    </div>
+                </div>
+        `).join('');
+    }
+
+    function renderPlaylist(playlist) {
+        document.getElementById('view-title').textContent = playlist.displayName;
+        document.getElementById('view-summary').textContent =
+            `플레이리스트 · ${playlist.tracks.length}곡 · 곡을 정리한 뒤 재생하세요.`;
+        document.getElementById('view-actions').innerHTML = `
+            <button class="button secondary" type="button" onclick="openRenameDialog()">이름 변경</button>
+            <button class="button secondary" type="button" onclick="loadPlaylist('${playlist.name}', false, 0)">대기열에 추가</button>
+            <button class="button primary" type="button" onclick="loadPlaylist('${playlist.name}', true, 0)">▶ 재생</button>
+            <button class="button danger" type="button" onclick="deletePlaylist('${playlist.name}')">삭제</button>
+        `;
+
+        const list = document.getElementById('content-list');
+        if (!playlist.tracks.length) {
+            list.innerHTML = '<div class="empty"><span class="empty-symbol">♫</span>이 플레이리스트는 비어 있습니다.<br>오른쪽 위에서 곡을 추가해 보세요.</div>';
+            return;
+        }
+        list.innerHTML = playlist.tracks.map((track, index) => `
+            <div class="queue-row source-row" draggable="true"
+                 ondragstart="sourceDragStart(event, 'playlist', ${index})"
+                 ondragend="sourceDragEnd(event)">
+                <div class="track-index">${index + 1}</div>
+                <div class="track-cell">
+                    <img class="track-cover" alt="" src="${thumbnail(track)}">
+                    <div style="min-width:0">
+                        <div class="track-name">${escapeHtml(track.title)}</div>
+                        <div class="track-author">${escapeHtml(track.author || '알 수 없는 아티스트')}</div>
+                    </div>
+                </div>
+                <div class="artist-col track-name">${escapeHtml(track.author || '—')}</div>
+                <div class="duration">${track.duration > 0 ? formatTime(track.duration) : '—'}</div>
+                <div class="row-actions">
+                    <button class="row-btn" type="button" title="이 곡부터 재생" onclick="playPlaylistFrom(${index})">▶</button>
+                    <button class="row-btn" type="button" title="대기열에 추가" onclick="addTrackObjectToQueue(selectedPlaylist().tracks[${index}])">＋</button>
+                    <button class="row-btn" type="button" title="위로" onclick="movePlaylistTrack(${index}, ${Math.max(0, index - 1)})">↑</button>
+                    <button class="row-btn" type="button" title="아래로" onclick="movePlaylistTrack(${index}, ${Math.min(playlist.tracks.length - 1, index + 1)})">↓</button>
+                    <button class="row-btn remove" type="button" title="플레이리스트에서 삭제" onclick="removePlaylistTrack(${index})">×</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderQueuePanel() {
+        const list = document.getElementById('queue-panel-list');
+        if (!state.queue.length) {
+            list.innerHTML = '<div class="empty" style="padding:55px 12px">대기열이 비어 있습니다.<br>왼쪽의 곡을 끌어오세요.</div>';
+            return;
+        }
+        list.innerHTML = state.queue.map((track, index) => {
+            const current = index === state.currentIndex && state.isPlaying;
+            return `
+                <div class="queue-compact-row${current ? ' current' : ''}" draggable="true"
+                     onclick="jumpToTrack(${index})"
+                     ondragstart="queueDragStart(event, ${index})"
+                     ondragover="queueRowDragOver(event)"
+                     ondragleave="event.currentTarget.classList.remove('drag-over')"
+                     ondrop="queueRowDrop(event, ${index})"
+                     ondragend="queueDragEnd(event)">
+                    <div class="track-index">${current ? (state.isPaused ? 'Ⅱ' : '▶') : index + 1}</div>
+                    <img class="track-cover" alt="" src="${thumbnail(track)}">
+                    <div style="min-width:0">
+                        <div class="track-name">${escapeHtml(track.title)}</div>
+                        <div class="track-author">${escapeHtml(track.author || '알 수 없는 아티스트')}</div>
+                    </div>
+                    <div class="row-actions">
+                        <button class="row-btn remove" type="button" title="대기열에서 삭제"
+                                onclick="event.stopPropagation(); removeTrack(${index})">×</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderPlayer() {
+        const track = state.queue[state.currentIndex];
+        const hasTrack = track && state.isPlaying;
+        document.getElementById('now-title').textContent = hasTrack ? track.title : '재생 중인 곡 없음';
+        document.getElementById('now-author').textContent = hasTrack ? (track.author || '알 수 없는 아티스트') : 'YouTube 음악을 추가해 보세요';
+        document.getElementById('now-cover').src = hasTrack ? thumbnail(track) : '';
+        document.getElementById('play-button').textContent = hasTrack && !state.isPaused ? 'Ⅱ' : '▶';
+        const loopButton = document.getElementById('loop-button');
+        loopButton.classList.toggle('active', state.loopEnabled);
+        loopButton.setAttribute('aria-pressed', String(state.loopEnabled));
+        loopButton.title = state.loopEnabled ? '대기열 반복 켜짐' : '대기열 반복 꺼짐';
+        updateTimeline();
+    }
+
+    function updateTimeline() {
+        let position = state.positionSeconds;
+        if (state.isPlaying && !state.isPaused) position += (Date.now() - state.stateReceivedAt) / 1000;
+        if (state.durationSeconds > 0) position = Math.min(position, state.durationSeconds);
+        if (isSeeking) position = seekPreviewSeconds;
+        const percent = state.durationSeconds > 0
+            ? Math.max(0, Math.min(100, position / state.durationSeconds * 100))
+            : 0;
+        const slider = document.getElementById('seek-slider');
+        slider.max = String(Math.max(0, Math.floor(state.durationSeconds)));
+        slider.disabled = !state.isPlaying || state.durationSeconds <= 0;
+        if (!isSeeking) slider.value = String(Math.floor(position));
+        slider.style.setProperty('--seek-percent', `${percent}%`);
+        document.getElementById('current-time').textContent = formatTime(position);
+        document.getElementById('total-time').textContent = state.durationSeconds > 0 ? formatTime(state.durationSeconds) : '--:--';
+    }
+
+    function startSeeking() {
+        if (state.isPlaying && state.durationSeconds > 0) isSeeking = true;
+    }
+
+    function previewSeek(value) {
+        if (!state.isPlaying || state.durationSeconds <= 0) return;
+        isSeeking = true;
+        seekPreviewSeconds = Math.max(0, Math.min(state.durationSeconds, Number(value) || 0));
+        updateTimeline();
+    }
+
+    function cancelSeeking() {
+        isSeeking = false;
+        updateTimeline();
+    }
+
+    async function commitSeek(value) {
+        if (!state.isPlaying || state.durationSeconds <= 0) {
+            isSeeking = false;
+            return;
+        }
+        const positionSeconds = Math.round(
+            Math.max(0, Math.min(state.durationSeconds, Number(value) || 0))
+        );
+        isSeeking = false;
+        state.positionSeconds = positionSeconds;
+        state.stateReceivedAt = Date.now();
+        updateTimeline();
+        await playerAction('/api/player/seek', {positionSeconds});
+    }
+
+    function openTrackDialog() {
+        const playlist = selectedPlaylist();
+        document.querySelector('#track-dialog h2').textContent =
+            state.view === 'playlist' && playlist ? `${playlist.displayName}에 곡 추가` : '대기열에 곡 추가';
+        openDialog('track-dialog');
+    }
+
+    async function addTrack(event) {
+        event.preventDefault();
+        const input = document.getElementById('youtube-url');
+        const button = document.getElementById('add-track-button');
+        button.disabled = true;
+        button.textContent = '정보 확인 중...';
+        try {
+            const info = await api('/api/youtube/info', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url: input.value.trim()})
+            });
+            const playlist = selectedPlaylist();
+            const targetPath = state.view === 'playlist' && playlist
+                ? `/api/playlists/${encodeURIComponent(playlist.name)}/tracks`
+                : '/api/queue';
+            await api(targetPath, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title: info.title, youtubeUrl: input.value.trim(),
+                    author: info.author, duration: info.duration || 0
+                })
+            });
+            input.value = '';
+            closeDialog('track-dialog');
+            toast(playlist && state.view === 'playlist'
+                ? `${playlist.displayName}에 추가했습니다.`
+                : '대기열에 추가했습니다.');
+            if (playlist && state.view === 'playlist') await loadPlaylists();
+            else await loadState();
+        } catch (error) {
+            toast(error.message, true);
+        } finally {
+            button.disabled = false;
+            button.textContent = '곡 추가';
+        }
+    }
+
+    async function importPlaylist(event) {
+        event.preventDefault();
+        const button = document.getElementById('import-button');
+        button.disabled = true;
+        button.textContent = '가져오는 중...';
+        try {
+            const playlist = await api('/api/playlists/import', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    url: document.getElementById('playlist-url').value.trim(),
+                    name: document.getElementById('playlist-name').value.trim()
+                })
+            });
+            event.target.reset();
+            closeDialog('import-dialog');
+            toast(`${playlist.displayName} · ${playlist.tracks.length}곡 저장 완료`);
+            await loadPlaylists();
+            openPlaylist(playlist.name);
+        } catch (error) {
+            toast(error.message, true);
+        } finally {
+            button.disabled = false;
+            button.textContent = '가져오기';
+        }
+    }
+
+    async function playerAction(path, body) {
+        try {
+            await api(path, {
+                method: 'POST',
+                headers: body ? {'Content-Type': 'application/json'} : undefined,
+                body: body ? JSON.stringify(body) : undefined
+            });
+            await loadState();
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    const playPause = () => playerAction('/api/player/play-pause');
+    const nextTrack = () => playerAction('/api/player/next');
+    const previousTrack = () => playerAction('/api/player/previous');
+    const jumpToTrack = (index) => playerAction('/api/player/jump', {index});
+    const toggleBossbar = (enabled) => playerAction('/api/player/bossbar', {enabled});
+    const toggleLoop = () => playerAction('/api/player/loop', {enabled: !state.loopEnabled});
+
+    async function stopMusic() {
+        if (!state.isPlaying) return;
+        await playerAction('/api/player/stop');
+        toast('재생을 중지했습니다.');
+    }
+
+    async function removeTrack(index) {
+        try {
+            await api(`/api/queue/${index}`, {method: 'DELETE'});
+            await loadState();
+        } catch (error) { toast(error.message, true); }
+    }
+
+    async function moveTrack(fromIndex, toIndex) {
+        if (fromIndex === toIndex) return;
+        try {
+            await api('/api/queue/move', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({fromIndex, toIndex})
+            });
+            await loadState();
+        } catch (error) { toast(error.message, true); }
+    }
+
+    async function loadPlaylist(name, replace, startIndex = 0) {
+        try {
+            await api('/api/player/load-playlist', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({playlistName: name, shuffle: false, replace, startIndex})
+            });
+            toast(replace
+                ? (startIndex > 0 ? `${startIndex + 1}번째 곡부터 재생합니다.` : '플레이리스트를 재생합니다.')
+                : '대기열 뒤에 추가했습니다.');
+            await loadState();
+        } catch (error) { toast(error.message, true); }
+    }
+
+    function playPlaylistFrom(index) {
+        const playlist = selectedPlaylist();
+        if (playlist) loadPlaylist(playlist.name, true, index);
+    }
+
+    async function playRecentTrack(index) {
+        const track = state.recent[index];
+        if (!track) return;
+        await playerAction('/api/player/play-track', track);
+        toast('선택한 곡을 재생합니다.');
+    }
+
+    async function addTrackObjectToQueue(track) {
+        if (!track) return;
+        try {
+            await api('/api/queue', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(track)
+            });
+            await loadState();
+            toast('재생 대기열에 추가했습니다.');
+        } catch (error) { toast(error.message, true); }
+    }
+
+    function openRenameDialog() {
+        const playlist = selectedPlaylist();
+        if (!playlist) return;
+        document.getElementById('rename-playlist-name').value = playlist.displayName;
+        openDialog('rename-dialog');
+    }
+
+    async function renamePlaylist(event) {
+        event.preventDefault();
+        const playlist = selectedPlaylist();
+        if (!playlist) return;
+        try {
+            await api(`/api/playlists/${encodeURIComponent(playlist.name)}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    displayName: document.getElementById('rename-playlist-name').value.trim()
+                })
+            });
+            closeDialog('rename-dialog');
+            toast('플레이리스트 이름을 변경했습니다.');
+            await loadPlaylists();
+        } catch (error) { toast(error.message, true); }
+    }
+
+    async function removePlaylistTrack(index) {
+        const playlist = selectedPlaylist();
+        if (!playlist) return;
+        try {
+            await api(`/api/playlists/${encodeURIComponent(playlist.name)}/tracks/${index}`, {
+                method: 'DELETE'
+            });
+            await loadPlaylists();
+        } catch (error) { toast(error.message, true); }
+    }
+
+    async function movePlaylistTrack(fromIndex, toIndex) {
+        const playlist = selectedPlaylist();
+        if (!playlist || fromIndex === toIndex) return;
+        try {
+            await api(`/api/playlists/${encodeURIComponent(playlist.name)}/tracks/move`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({fromIndex, toIndex})
+            });
+            await loadPlaylists();
+        } catch (error) { toast(error.message, true); }
+    }
+
+    async function deletePlaylist(name) {
+        const playlist = selectedPlaylist();
+        if (!playlist || !confirm(`'${playlist.displayName}' 플레이리스트를 삭제할까요?`)) return;
+        try {
+            await api(`/api/playlists/${encodeURIComponent(name)}`, {method: 'DELETE'});
+            showRecent();
+            await loadPlaylists();
+            toast('플레이리스트를 삭제했습니다.');
+        } catch (error) { toast(error.message, true); }
+    }
+
+    function sourceTrack(source, index) {
+        return source === 'recent'
+            ? state.recent[index]
+            : selectedPlaylist()?.tracks[index];
+    }
+
+    function sourceDragStart(event, source, index) {
+        const track = sourceTrack(source, index);
+        if (!track) return;
+        event.currentTarget.classList.add('dragging');
+        event.dataTransfer.effectAllowed = 'copy';
+        const payload = JSON.stringify({type: 'track', track});
+        event.dataTransfer.setData('application/json', payload);
+        event.dataTransfer.setData('text/plain', payload);
+    }
+
+    function sourceDragEnd(event) {
+        event.currentTarget.classList.remove('dragging');
+        document.getElementById('queue-panel').classList.remove('drag-target');
+    }
+
+    function queueDragStart(event, index) {
+        event.currentTarget.classList.add('dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        const payload = JSON.stringify({type: 'queue', index});
+        event.dataTransfer.setData('application/json', payload);
+        event.dataTransfer.setData('text/plain', payload);
+    }
+
+    function queueDragEnd(event) {
+        event.currentTarget.classList.remove('dragging');
+        document.querySelectorAll('.queue-compact-row').forEach(row => row.classList.remove('drag-over'));
+        document.getElementById('queue-panel').classList.remove('drag-target');
+    }
+
+    function readDragPayload(event) {
+        try {
+            const raw = event.dataTransfer.getData('application/json') ||
+                event.dataTransfer.getData('text/plain');
+            return JSON.parse(raw);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function queueRowDragOver(event) {
+        event.preventDefault();
+        event.currentTarget.classList.add('drag-over');
+    }
+
+    async function queueRowDrop(event, targetIndex) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.classList.remove('drag-over');
+        const payload = readDragPayload(event);
+        if (payload?.type === 'queue') {
+            await moveTrack(payload.index, targetIndex);
+        } else if (payload?.type === 'track' && payload.track) {
+            try {
+                await api('/api/queue/insert', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index: targetIndex, track: payload.track})
+                });
+                await loadState();
+                toast('선택한 위치에 곡을 추가했습니다.');
+            } catch (error) { toast(error.message, true); }
+        }
+    }
+
+    function queuePanelDragOver(event) {
+        event.preventDefault();
+        if (event.target.closest('.queue-compact-row')) return;
+        event.currentTarget.classList.add('drag-target');
+    }
+
+    function queuePanelDragLeave(event) {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+            event.currentTarget.classList.remove('drag-target');
+        }
+    }
+
+    async function queuePanelDrop(event) {
+        if (event.target.closest('.queue-compact-row')) return;
+        event.preventDefault();
+        event.currentTarget.classList.remove('drag-target');
+        const payload = readDragPayload(event);
+        if (payload?.type === 'track' && payload.track) {
+            await addTrackObjectToQueue(payload.track);
+        } else if (payload?.type === 'queue' && state.queue.length) {
+            await moveTrack(payload.index, state.queue.length - 1);
+        }
+    }
+
+    document.querySelectorAll('dialog').forEach(dialog => {
+        dialog.addEventListener('click', event => {
+            if (event.target === dialog) dialog.close();
+        });
+    });
+
+    loadState();
+    loadPlaylists();
+    loadRecent();
+    setInterval(loadState, 2500);
+    setInterval(updateTimeline, 250);
+</script>
+</body>
+</html>

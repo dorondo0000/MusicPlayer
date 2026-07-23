@@ -1,0 +1,15 @@
+﻿# CinematoMusicPlayer Configuration
+
+# Web server settings
+web-server:
+  enabled: true
+  port: 9090
+  # Address that Minecraft clients can use to reach this server.
+  # For local testing, localhost is correct. Change this to the public
+  # server address when clients connect from another computer.
+  client-base-url: "http://localhost:9090"
+
+# Music settings
+music:
+  # Show bossbar by default
+  default-bossbar-enabled: true
