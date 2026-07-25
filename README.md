@@ -110,7 +110,7 @@ Windows:
 .\gradlew.bat shadowJar
 ```
 
-완성된 JAR은 `build/libs/CinematoMusicPlayer-1.1.0.jar`에 생성됩니다.
+완성된 JAR은 `build/libs/CinematoMusicPlayer-1.1.1.jar`에 생성됩니다.
 
 ## Cinema Mod의 R 키
 
