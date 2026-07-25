@@ -26,7 +26,7 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
         private const val SCREEN_Y = -1000
         private const val SCREEN_Z = 0
         private const val YOUTUBE_BRIDGE_URL =
-            "https://dorondo0000.github.io/MusicPlayer/bridge/v1.1.2/youtube.html"
+            "https://dorondo0000.github.io/MusicPlayer/bridge/v1.1.3/youtube.html"
         // Cinema Mod treats duration 0 as a livestream and deliberately skips
         // seeking. Use a long VOD duration for legacy/API tracks whose duration
         // is unknown so late joiners can still synchronize to startedAt.

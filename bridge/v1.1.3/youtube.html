@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #player {
+            width: 200%;
+            height: 100%;
+            position: absolute;
+            left: -50%;
+        }
+    </style>
+</head>
+<body>
+<div id="player"></div>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    let player = null;
+    let playerReady = false;
+    let queuedVideo = null;
+    let activeVideo = null;
+    let queuedVolume = 100;
+    let userVolume = 100;
+    let startTime = 0;
+    let seekToEnd = false;
+    let adShowing = false;
+
+    function timestamp() {
+        return Date.now() * 0.001;
+    }
+
+    function targetTime() {
+        return Math.max(0, (timestamp() - startTime) - 0.5);
+    }
+
+    function isAdPlaying() {
+        try {
+            const data = player.getVideoData();
+            return Boolean(
+                data &&
+                activeVideo &&
+                data.video_id &&
+                data.video_id !== activeVideo
+            );
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function skipAd() {
+        const duration = player.getDuration();
+        if (duration > 0) {
+            player.seekTo(duration, true);
+        }
+        if (player.getPlayerState() !== YT.PlayerState.PLAYING) {
+            player.playVideo();
+        }
+        player.loadVideoById(activeVideo);
+    }
+
+    function maintainPlayback() {
+        if (!playerReady || !player) return;
+
+        if (queuedVideo !== null) {
+            const video = queuedVideo;
+            queuedVideo = null;
+            activeVideo = video;
+            adShowing = false;
+            player.loadVideoById(video);
+        }
+
+        if (queuedVolume !== null) {
+            userVolume = queuedVolume;
+            if (!adShowing) {
+                player.setVolume(userVolume);
+            }
+            queuedVolume = null;
+        }
+
+        const adNow = isAdPlaying();
+        if (adNow && !adShowing) {
+            adShowing = true;
+            player.setVolume(0);
+        } else if (!adNow && adShowing) {
+            adShowing = false;
+            player.setVolume(userVolume);
+        }
+
+        if (adShowing) {
+            skipAd();
+            return;
+        }
+
+        if (seekToEnd && player.getDuration() > 0) {
+            startTime = timestamp() - player.getDuration();
+            seekToEnd = false;
+        }
+
+        const target = targetTime();
+        const duration = player.getDuration();
+        if (target < duration - 1 && Math.abs(player.getCurrentTime() - target) > 2) {
+            player.seekTo(target, true);
+        }
+
+        if (player.getPlayerState() !== YT.PlayerState.PLAYING) {
+            player.playVideo();
+        }
+    }
+
+    setInterval(maintainPlayback, 100);
+
+    window.th_video = function (id, live = false) {
+        const nextVideo = String(id || "");
+        if (nextVideo === activeVideo || nextVideo === queuedVideo) return;
+
+        startTime = timestamp();
+        seekToEnd = Boolean(live);
+        adShowing = false;
+
+        if (player !== null) {
+            queuedVideo = nextVideo;
+            return;
+        }
+
+        activeVideo = nextVideo;
+        player = new YT.Player("player", {
+            height: "100%",
+            width: "100%",
+            videoId: nextVideo,
+            host: "https://www.youtube-nocookie.com",
+            playerVars: {
+                autoplay: 1,
+                controls: 0,
+                showinfo: 0,
+                modestbranding: 1,
+                rel: 0,
+                iv_load_policy: 3
+            },
+            events: {
+                onReady: function () {
+                    playerReady = true;
+                }
+            }
+        });
+    };
+
+    window.th_volume = function (volume) {
+        queuedVolume = Math.max(0, Math.min(100, Number(volume) || 0));
+    };
+
+    window.th_seek = function (seconds) {
+        startTime = timestamp() - Math.max(0, Number(seconds) || 0);
+    };
+</script>
+</body>
+</html>
