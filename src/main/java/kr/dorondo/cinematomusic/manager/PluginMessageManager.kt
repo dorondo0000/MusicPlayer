@@ -9,8 +9,11 @@ import kr.dorondo.cinematomusic.util.YouTubeUtil
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListener {
+    private val initializedPlayers = ConcurrentHashMap.newKeySet<UUID>()
     
     companion object {
         // Cinema Mod channels
@@ -23,7 +26,7 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
         private const val SCREEN_Y = -1000
         private const val SCREEN_Z = 0
         private const val YOUTUBE_BRIDGE_URL =
-            "https://dorondo0000.github.io/MusicPlayer/bridge/v1.1.1/youtube.html"
+            "https://dorondo0000.github.io/MusicPlayer/bridge/v1.1.2/youtube.html"
         // Cinema Mod treats duration 0 as a livestream and deliberately skips
         // seeking. Use a long VOD duration for legacy/API tracks whose duration
         // is unknown so late joiners can still synchronize to startedAt.
@@ -43,6 +46,8 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
     }
 
     fun bootstrap(player: Player) {
+        if (!initializedPlayers.add(player.uniqueId)) return
+
         sendServices(player)
         sendHiddenScreen(player)
         plugin.logger.info("[PluginMessage] Cinema client initialized for ${player.name}")
@@ -54,9 +59,13 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
             return false
         }
 
-        // These packets are deliberately repeated before playback. This makes
-        // playback work after client resource reloads and plugin hot reloads.
-        bootstrap(player)
+        // CinemaMod's original server integration registers services/screens
+        // once after login. Re-registering the same screen closes the client's
+        // existing browser, so only initialize here as a fallback for hot
+        // reloads or playback during the first seconds of login.
+        if (player.uniqueId !in initializedPlayers) {
+            bootstrap(player)
+        }
 
         val buf = CinemaPacketBuf()
         writeScreenPosition(buf)
@@ -80,6 +89,10 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
         val buf = CinemaPacketBuf()
         writeScreenPosition(buf)
         player.sendPluginMessage(plugin, CHANNEL_UNLOAD_SCREEN, buf.array())
+    }
+
+    fun forget(player: Player) {
+        initializedPlayers.remove(player.uniqueId)
     }
 
     private fun sendServices(player: Player) {
@@ -114,6 +127,7 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
     }
     
     fun unregister() {
+        initializedPlayers.clear()
         val messenger = Bukkit.getMessenger()
         
         messenger.unregisterOutgoingPluginChannel(plugin, CHANNEL_LOAD_SCREEN)

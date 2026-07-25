@@ -460,6 +460,7 @@ class MusicPlayerManager(private val plugin: MusicPlayer) : Listener {
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
         bossBar.removePlayer(event.player)
+        plugin.getPluginMessageManager().forget(event.player)
     }
 }
 
