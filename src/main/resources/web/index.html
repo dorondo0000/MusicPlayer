@@ -672,6 +672,7 @@
         <header class="topbar">
             <div class="server-status"><span class="status-dot"></span><span id="online-label">서버 연결됨</span></div>
             <div class="top-actions">
+                <button class="button secondary" type="button" onclick="logout()">로그아웃</button>
                 <button class="button secondary" type="button" onclick="openDialog('import-dialog')">플리 가져오기</button>
                 <button class="button primary" type="button" onclick="openTrackDialog()"><span>＋</span><span class="wide-label">곡 추가</span></button>
             </div>
@@ -881,10 +882,23 @@
     }
 
     async function api(path, options = {}) {
+        options.headers = {
+            'X-MusicPlayer-Admin': '1',
+            ...(options.headers || {})
+        };
         const response = await fetch(path, options);
+        if (response.status === 401) {
+            location.replace('/login');
+            throw new Error('로그인이 만료되었습니다.');
+        }
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error || '요청을 처리하지 못했습니다.');
         return body;
+    }
+
+    async function logout() {
+        await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
+        location.replace('/login');
     }
 
     async function loadState() {

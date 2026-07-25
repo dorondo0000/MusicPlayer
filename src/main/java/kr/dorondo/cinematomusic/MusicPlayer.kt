@@ -6,6 +6,8 @@ import kr.dorondo.cinematomusic.manager.PlaylistManager
 import kr.dorondo.cinematomusic.manager.MusicPlayerManager
 import kr.dorondo.cinematomusic.manager.WebServerManager
 import kr.dorondo.cinematomusic.manager.PluginMessageManager
+import org.bukkit.command.Command
+import org.bukkit.command.CommandSender
 import org.bukkit.plugin.java.JavaPlugin
 
 class MusicPlayer : JavaPlugin() {
@@ -75,6 +77,36 @@ class MusicPlayer : JavaPlugin() {
         }
         
         logger.info("MusicPlayer disabled!")
+    }
+
+    override fun onCommand(
+        sender: CommandSender,
+        command: Command,
+        label: String,
+        args: Array<out String>
+    ): Boolean {
+        if (!command.name.equals("musicplayer", ignoreCase = true)) return false
+        if (!sender.hasPermission("musicplayer.admin")) {
+            sender.sendMessage("§c권한이 없습니다.")
+            return true
+        }
+        if (args.size < 2 || !args[0].equals("password", ignoreCase = true)) {
+            sender.sendMessage("§e사용법: /$label password <새 비밀번호>")
+            return true
+        }
+
+        val password = args.drop(1).joinToString(" ")
+        if (password.length < 8) {
+            sender.sendMessage("§c비밀번호는 8자 이상이어야 합니다.")
+            return true
+        }
+
+        configManager.setAdminPassword(password)
+        if (::webServerManager.isInitialized) {
+            webServerManager.invalidateSessions()
+        }
+        sender.sendMessage("§aMusicPlayer 웹 관리자 비밀번호를 변경했습니다. 기존 로그인은 모두 해제됩니다.")
+        return true
     }
     
     fun getConfigManager() = configManager

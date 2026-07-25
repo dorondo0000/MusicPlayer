@@ -5,3 +5,12 @@ api-version: '1.21'
 author: dorondo
 description: Simple music player using Cinema mod without screens
 softdepend: [Skript]
+commands:
+  musicplayer:
+    description: MusicPlayer administrator settings
+    usage: /musicplayer password <password>
+    permission: musicplayer.admin
+permissions:
+  musicplayer.admin:
+    description: Change MusicPlayer administrator settings
+    default: op

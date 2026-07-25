@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MusicPlayer 관리자 로그인</title>
+    <style>
+        :root { color-scheme: dark; font-family: Inter, Pretendard, "Noto Sans KR", system-ui, sans-serif; }
+        * { box-sizing: border-box; }
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            color: #fff;
+            background:
+                radial-gradient(circle at 50% -20%, #1d6b3a 0, transparent 42%),
+                linear-gradient(#161616, #000 70%);
+        }
+        .card {
+            width: min(420px, 100%);
+            padding: 42px;
+            border: 1px solid #292929;
+            border-radius: 18px;
+            background: rgba(18, 18, 18, .96);
+            box-shadow: 0 28px 80px rgba(0, 0, 0, .55);
+        }
+        .logo {
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 26px;
+            border-radius: 50%;
+            background: #1ed760;
+            color: #07180d;
+            font-size: 25px;
+        }
+        h1 { margin: 0 0 8px; font-size: 27px; letter-spacing: -.6px; }
+        p { margin: 0 0 30px; color: #aaa; line-height: 1.55; }
+        label { display: block; margin-bottom: 9px; font-size: 14px; font-weight: 700; }
+        input {
+            width: 100%;
+            height: 50px;
+            padding: 0 15px;
+            border: 1px solid #727272;
+            border-radius: 6px;
+            outline: none;
+            background: #121212;
+            color: #fff;
+            font: inherit;
+        }
+        input:focus { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+        button {
+            width: 100%;
+            height: 50px;
+            margin-top: 20px;
+            border: 0;
+            border-radius: 999px;
+            background: #1ed760;
+            color: #07180d;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        button:hover { background: #3be477; transform: scale(1.01); }
+        button:disabled { opacity: .6; cursor: wait; }
+        .error { min-height: 22px; margin-top: 14px; color: #ff7770; font-size: 14px; }
+        .hint { margin-top: 24px; color: #777; font-size: 12px; line-height: 1.5; }
+        code { color: #bbb; }
+    </style>
+</head>
+<body>
+<main class="card">
+    <div class="logo">♪</div>
+    <h1>관리자 로그인</h1>
+    <p>MusicPlayer를 관리하려면 서버에서 설정한 비밀번호를 입력하세요.</p>
+    <form id="login-form">
+        <label for="password">관리자 비밀번호</label>
+        <input id="password" type="password" required autofocus autocomplete="current-password">
+        <button id="login-button" type="submit">로그인</button>
+        <div id="error" class="error" role="alert"></div>
+    </form>
+    <div class="hint">비밀번호 설정: <code>/musicplayer password &lt;새 비밀번호&gt;</code></div>
+</main>
+<script>
+    document.getElementById('login-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = document.getElementById('login-button');
+        const error = document.getElementById('error');
+        button.disabled = true;
+        error.textContent = '';
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: document.getElementById('password').value })
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(body.error || '로그인하지 못했습니다.');
+            location.replace('/');
+        } catch (reason) {
+            error.textContent = reason.message;
+            document.getElementById('password').select();
+        } finally {
+            button.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>

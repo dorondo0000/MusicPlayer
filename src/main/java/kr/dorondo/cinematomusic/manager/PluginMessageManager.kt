@@ -22,6 +22,8 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
         private const val SCREEN_X = 0
         private const val SCREEN_Y = -1000
         private const val SCREEN_Z = 0
+        private const val YOUTUBE_BRIDGE_URL =
+            "https://dorondo0000.github.io/MusicPlayer/bridge/v1.1.0/youtube.html"
         // Cinema Mod treats duration 0 as a livestream and deliberately skips
         // seeking. Use a long VOD duration for legacy/API tracks whose duration
         // is unknown so late joiners can still synchronize to startedAt.
@@ -84,9 +86,9 @@ class PluginMessageManager(private val plugin: MusicPlayer) : PluginMessageListe
         val buf = CinemaPacketBuf()
         buf.writeInt(1)
         buf.writeString("YOUTUBE")
-        // The query version prevents CEF from reusing an older playback bridge
-        // after the plugin JAR is updated.
-        buf.writeString("${plugin.getConfigManager().getClientBaseUrl()}/cinema/youtube.html?bridge=11")
+        // Playback uses a versioned public static bridge, just like the
+        // original CinemaMod service. It never depends on the admin web port.
+        buf.writeString(YOUTUBE_BRIDGE_URL)
         buf.writeString("th_volume(%d);")
         buf.writeString("th_video('%s', %b);")
         buf.writeString("th_seek(%d);")

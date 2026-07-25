@@ -3,16 +3,28 @@
 import com.google.gson.Gson
 import io.javalin.Javalin
 import io.javalin.http.Context
+import io.javalin.http.ForbiddenResponse
+import io.javalin.http.HandlerType
+import io.javalin.http.NotFoundResponse
+import io.javalin.http.UnauthorizedResponse
 import kr.dorondo.cinematomusic.MusicPlayer
 import kr.dorondo.cinematomusic.model.Track
 import kr.dorondo.cinematomusic.util.YouTubeUtil
 import org.bukkit.Bukkit
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Callable
 
 class WebServerManager(private val plugin: MusicPlayer) {
     
     private var app: Javalin? = null
     private val gson = Gson()
+    private val sessions = ConcurrentHashMap<String, Long>()
+    private val secureRandom = SecureRandom()
+    private val sessionLifetimeMillis = 24L * 60L * 60L * 1000L
 
     private inline fun <reified T> parseBody(ctx: Context): T =
         gson.fromJson(ctx.body(), T::class.java)
@@ -28,7 +40,6 @@ class WebServerManager(private val plugin: MusicPlayer) {
         try {
             app = Javalin.create { config ->
                 config.showJavalinBanner = false
-                config.staticFiles.add("/web")
             }.start(port)
             
             setupRoutes()
@@ -42,12 +53,61 @@ class WebServerManager(private val plugin: MusicPlayer) {
     
     fun stop() {
         app?.stop()
+        sessions.clear()
         plugin.logger.info("Web server stopped")
+    }
+
+    fun invalidateSessions() {
+        sessions.clear()
     }
     
     private fun setupRoutes() {
         val app = this.app ?: return
-        
+
+        app.before { ctx ->
+            val path = ctx.path()
+            if (path.startsWith("/api/")) {
+                requireSession(ctx)
+                if (path.startsWith("/api/") && ctx.method() !in setOf(HandlerType.GET, HandlerType.HEAD)) {
+                    if (!secureEquals(ctx.header("X-MusicPlayer-Admin"), "1")) {
+                        throw ForbiddenResponse("관리자 웹 화면에서만 변경할 수 있습니다.")
+                    }
+                }
+            }
+        }
+
+        app.get("/login") { ctx ->
+            if (hasValidSession(ctx)) {
+                ctx.redirect("/")
+            } else {
+                serveHtml(ctx, "/web/login.html")
+            }
+        }
+        app.post("/auth/login") { ctx ->
+            val data = parseBody<LoginRequest>(ctx)
+            if (!secureEquals(data.password, plugin.getConfigManager().getAdminPassword())) {
+                ctx.status(401).json(mapOf("error" to "비밀번호가 올바르지 않습니다."))
+                return@post
+            }
+
+            val sessionId = generateSessionId()
+            sessions[sessionId] = System.currentTimeMillis() + sessionLifetimeMillis
+            ctx.header(
+                "Set-Cookie",
+                "musicplayer_session=$sessionId; Path=/; Max-Age=86400; HttpOnly; SameSite=Strict"
+            )
+            ctx.json(mapOf("success" to true))
+        }
+        app.post("/auth/logout") { ctx ->
+            ctx.cookie("musicplayer_session")?.let { sessions.remove(it) }
+            ctx.header(
+                "Set-Cookie",
+                "musicplayer_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"
+            )
+            ctx.json(mapOf("success" to true))
+        }
+        app.get("/") { ctx -> serveDashboard(ctx) }
+        app.get("/index.html") { ctx -> serveDashboard(ctx) }
         // Get YouTube video info
         app.post("/api/youtube/info") { ctx ->
             try {
@@ -365,8 +425,57 @@ class WebServerManager(private val plugin: MusicPlayer) {
             }
         }
     }
+
+    private fun serveDashboard(ctx: Context) {
+        if (!hasValidSession(ctx)) {
+            ctx.redirect("/login")
+            return
+        }
+        serveHtml(ctx, "/web/index.html")
+    }
+
+    private fun requireSession(ctx: Context) {
+        if (!hasValidSession(ctx)) {
+            throw UnauthorizedResponse("로그인이 필요합니다.")
+        }
+    }
+
+    private fun hasValidSession(ctx: Context): Boolean {
+        val sessionId = ctx.cookie("musicplayer_session") ?: return false
+        val expiresAt = sessions[sessionId] ?: return false
+        if (expiresAt <= System.currentTimeMillis()) {
+            sessions.remove(sessionId)
+            return false
+        }
+        return true
+    }
+
+    private fun generateSessionId(): String {
+        val bytes = ByteArray(32)
+        secureRandom.nextBytes(bytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+    }
+
+    private fun secureEquals(actual: String?, expected: String): Boolean {
+        if (actual == null) return false
+        return MessageDigest.isEqual(
+            actual.toByteArray(StandardCharsets.UTF_8),
+            expected.toByteArray(StandardCharsets.UTF_8)
+        )
+    }
+
+    private fun serveHtml(ctx: Context, resourcePath: String) {
+        val html = javaClass.getResourceAsStream(resourcePath)
+            ?.bufferedReader(StandardCharsets.UTF_8)
+            ?.use { it.readText() }
+            ?: throw NotFoundResponse()
+        ctx.contentType("text/html; charset=utf-8").result(html)
+    }
     
     data class YouTubeUrlRequest(val url: String) {
+        constructor() : this("")
+    }
+    data class LoginRequest(val password: String) {
         constructor() : this("")
     }
     data class CreatePlaylistRequest(val name: String, val displayName: String)
